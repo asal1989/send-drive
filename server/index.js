@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -9,6 +9,7 @@ const fs = require('fs');
 const { getValidToken } = require('./auth');
 
 const app = express();
+app.set('trust proxy', 1); // trust Nginx reverse proxy
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 const FOLDER = process.env.UPLOAD_FOLDER || 'SendDrive';
 const UPN = process.env.ONEDRIVE_USER_UPN;
