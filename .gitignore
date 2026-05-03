@@ -1,0 +1,8 @@
+node_modules/
+senddrive/node_modules/
+server/node_modules/
+senddrive/dist/
+server/.env
+server/token-store.json
+server/transfers.json
+.DS_Store
