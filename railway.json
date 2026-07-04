@@ -5,7 +5,7 @@
     "buildCommand": "cd senddrive && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "cd server && rm -rf node_modules package-lock.json && npm install && node index.js",
+    "startCommand": "cd server && rm -rf node_modules package-lock.json && npm cache clean --force && npm install --no-cache && ls node_modules | grep -qi archiver && echo ARCHIVER_OK || npm install archiver@8.0.0 --no-cache && node index.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
