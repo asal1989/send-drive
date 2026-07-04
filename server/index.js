@@ -6,7 +6,7 @@ const axios = require('axios');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const archiver = require('archiver');
+const archiver = require('archiver'); // pinned to 7.0.1 in package.json — 8.x is ESM-only and dropped the archiver('zip', opts) factory API
 const { getValidToken } = require('./auth');
 
 const app = express();
