@@ -5,7 +5,7 @@
     "buildCommand": "cd senddrive && npm install && npm run build"
   },
   "deploy": {
-    "startCommand": "cd server && npm install && node index.js",
+    "startCommand": "cd server && rm -rf node_modules && npm install && node index.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
