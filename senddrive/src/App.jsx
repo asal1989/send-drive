@@ -1,9 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { createTransfer, uploadFile } from "./oneDriveService";
 import "./App.css";
 
-const MAX_RECIPIENTS = 3;
-const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_RECIPIENTS = 10;
+const MAX_FILE_SIZE = 250 * 1024 * 1024 * 1024; // 250 GB
 
 const BG_IMAGES = [
   "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1920&q=80",
@@ -36,6 +36,30 @@ function persistEmails(emails) {
   localStorage.setItem("sd_recent_emails", JSON.stringify(emails));
 }
 
+// ── "My Transfers" — sender-side history + self-service recall ──────────────
+// There's no login system, so history lives in this browser's localStorage
+// (same trust model as the uploadToken itself: whoever holds it owns the
+// transfer). A transfer sent from a different device/browser won't show up
+// here — that's the accepted tradeoff for not building real accounts.
+const MY_TRANSFERS_KEY = "sd_my_transfers";
+
+function loadMyTransfers() {
+  try { return JSON.parse(localStorage.getItem(MY_TRANSFERS_KEY) || "[]"); } catch { return []; }
+}
+
+function persistMyTransfers(list) {
+  localStorage.setItem(MY_TRANSFERS_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+function addMyTransfer(entry) {
+  const list = [entry, ...loadMyTransfers().filter((t) => t.transferId !== entry.transferId)];
+  persistMyTransfers(list);
+}
+
+function removeMyTransfer(transferId) {
+  persistMyTransfers(loadMyTransfers().filter((t) => t.transferId !== transferId));
+}
+
 function computeETA(progress, files, startTime) {
   if (!startTime || !files.length) return "";
   const elapsed = (Date.now() - startTime) / 1000;
@@ -47,6 +71,99 @@ function computeETA(progress, files, startTime) {
   if (remaining < 10) return "";
   if (remaining < 60) return `~${Math.ceil(remaining)}s left`;
   return `~${Math.ceil(remaining / 60)}m left`;
+}
+
+function MyTransfersPanel({ onClose }) {
+  const [transfers, setTransfers] = useState(loadMyTransfers);
+  const [statuses, setStatuses] = useState({}); // transferId -> status | 'gone' | 'loading'
+  const [cancelling, setCancelling] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
+  useEffect(() => {
+    transfers.forEach(async (t) => {
+      setStatuses((prev) => ({ ...prev, [t.transferId]: "loading" }));
+      try {
+        const res = await fetch(`/api/transfer/${t.transferId}/status?token=${encodeURIComponent(t.uploadToken)}`);
+        if (!res.ok) { setStatuses((prev) => ({ ...prev, [t.transferId]: "gone" })); return; }
+        const data = await res.json();
+        setStatuses((prev) => ({ ...prev, [t.transferId]: data }));
+      } catch {
+        setStatuses((prev) => ({ ...prev, [t.transferId]: "gone" }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once when the panel opens — cancel/remove update state locally, no re-fetch needed
+
+  const cancelTransfer = async (t) => {
+    if (!window.confirm(`Cancel "${t.title}"? Recipients won't be able to download it anymore.`)) return;
+    setCancelling(t.transferId);
+    try {
+      await fetch(`/api/transfer/${t.transferId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uploadToken: t.uploadToken }),
+      });
+    } catch { /* best-effort — remove locally regardless */ }
+    removeMyTransfer(t.transferId);
+    setTransfers(loadMyTransfers());
+    setCancelling(null);
+  };
+
+  const copyLink = (t) => {
+    navigator.clipboard?.writeText(t.downloadPageUrl).then(() => {
+      setCopiedId(t.transferId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  return (
+    <div className="wt-modal-overlay" onClick={onClose}>
+      <div className="wt-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="wt-modal-head">
+          <h3>My Transfers</h3>
+          <button className="wt-modal-close" onClick={onClose}><XIcon /></button>
+        </div>
+        <div className="wt-modal-body">
+          {transfers.length === 0 ? (
+            <p className="wt-modal-empty">Transfers you send from this browser will show up here.</p>
+          ) : (
+            transfers.map((t) => {
+              const status = statuses[t.transferId];
+              const isGone = status === "gone" || (status && status.expired);
+              return (
+                <div key={t.transferId} className={`wt-mt-row${isGone ? " gone" : ""}`}>
+                  <div className="wt-mt-info">
+                    <div className="wt-mt-title">{t.title}</div>
+                    <div className="wt-mt-meta">
+                      {t.fileNames.length} file{t.fileNames.length !== 1 ? "s" : ""} · {formatSize(t.totalSize)}
+                      {status && status !== "loading" && status !== "gone" && (
+                        <> · {status.downloadCount} download{status.downloadCount !== 1 ? "s" : ""}</>
+                      )}
+                      {isGone && <> · expired or cancelled</>}
+                    </div>
+                  </div>
+                  <div className="wt-mt-actions">
+                    {!isGone && (
+                      <button className="wt-mt-btn" onClick={() => copyLink(t)}>
+                        {copiedId === t.transferId ? "Copied!" : "Copy link"}
+                      </button>
+                    )}
+                    <button
+                      className="wt-mt-btn wt-mt-btn-danger"
+                      onClick={() => (isGone ? (removeMyTransfer(t.transferId), setTransfers(loadMyTransfers())) : cancelTransfer(t))}
+                      disabled={cancelling === t.transferId}
+                    >
+                      {isGone ? "Remove" : cancelling === t.transferId ? "Cancelling…" : "Cancel"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -64,6 +181,7 @@ export default function App() {
 
   // Advanced options
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [expiryDays, setExpiryDays] = useState(7);
   const [passwordEnabled, setPasswordEnabled] = useState(false);
   const [password, setPassword] = useState("");
@@ -76,6 +194,9 @@ export default function App() {
 
   // Dark mode
   const [dark, setDark] = useState(() => localStorage.getItem("sd_dark") === "1");
+
+  // My Transfers panel
+  const [showMyTransfers, setShowMyTransfers] = useState(false);
 
   // Email delivery status
   const [emailSent, setEmailSent] = useState(null); // null | true | false
@@ -91,7 +212,7 @@ export default function App() {
     let arr = Array.from(newFiles);
     const oversized = arr.filter((f) => f.size > MAX_FILE_SIZE);
     if (oversized.length > 0) {
-      setError(`Too large (max 2 GB): ${oversized.map((f) => f.name).join(", ")}`);
+      setError(`Too large (max 250 GB): ${oversized.map((f) => f.name).join(", ")}`);
       arr = arr.filter((f) => f.size <= MAX_FILE_SIZE);
     }
     setFiles((prev) => {
@@ -145,10 +266,10 @@ export default function App() {
     setEmailSent(null);
     uploadStartRef.current = Date.now();
     try {
-      const { transferId, folderId, downloadPageUrl } = await createTransfer();
+      const { transferId, uploadToken, downloadPageUrl } = await createTransfer();
 
       for (let i = 0; i < files.length; i++) {
-        await uploadFile(files[i], transferId, (pct) =>
+        await uploadFile(files[i], transferId, uploadToken, (pct) =>
           setProgress((prev) => ({ ...prev, [i]: pct }))
         );
       }
@@ -156,12 +277,23 @@ export default function App() {
       const link = downloadPageUrl;
       setShareLink(link);
 
+      addMyTransfer({
+        transferId,
+        uploadToken,
+        title: title || "Files shared with you",
+        fileNames: files.map((f) => f.name),
+        totalSize: files.reduce((s, f) => s + f.size, 0),
+        downloadPageUrl: link,
+        createdAt: new Date().toISOString(),
+      });
+
       // Register transfer metadata for admin + notifications + password
       await fetch("/api/register-transfer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transferId,
+          uploadToken,
           senderEmail,
           title: title || "Files shared with you",
           fileNames: files.map((f) => f.name),
@@ -178,6 +310,8 @@ export default function App() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               recipients,
+              transferId,
+              uploadToken,
               senderEmail,
               title: title || "Files shared with you",
               message,
@@ -205,10 +339,26 @@ export default function App() {
     }
   };
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(shareLink);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyLink = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareLink);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = shareLink;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Copy failed. Select the link above and copy it manually.");
+    }
   };
 
   const reset = () => {
@@ -217,6 +367,7 @@ export default function App() {
     setRecipients([]); setRecipientInput(""); setSenderEmail("");
     setTitle(""); setMessage(""); setPassword("");
     setPasswordEnabled(false); setShowAdvanced(false);
+    setShowOptionsMenu(false);
     setEmailSent(null);
     uploadStartRef.current = null;
   };
@@ -252,10 +403,15 @@ export default function App() {
             <span className="wt-logo-sub">PRIVATE LIMITED</span>
           </div>
         </div>
+        <button className="wt-my-transfers-btn" onClick={() => setShowMyTransfers(true)} title="My Transfers">
+          <HistoryIcon /> My Transfers
+        </button>
         <button className="wt-dark-toggle" onClick={toggleDark} title="Toggle dark mode">
           {dark ? <SunIcon /> : <MoonIcon />}
         </button>
       </nav>
+
+      {showMyTransfers && <MyTransfersPanel onClose={() => setShowMyTransfers(false)} />}
 
       <main className="wt-main">
         {done ? (
@@ -306,27 +462,31 @@ export default function App() {
           </>
         ) : (
           <>
-            <div className="wt-card">
-              {/* Files section */}
+            <div className="wt-card wt-transfer-card">
+              <div className="wt-card-tab">Request files</div>
               <div
                 className={`wt-files-section ${dragOver ? "drag" : ""}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={onDrop}
               >
-                {files.length === 0 ? (
-                  <div className="wt-dropzone" onClick={() => document.getElementById("wt-file-input").click()}>
-                    <div className="wt-add-circle"><PlusIcon /></div>
-                    <p className="wt-drop-title">Add your files</p>
-                    <p className="wt-drop-sub">or drop them here</p>
-                  </div>
-                ) : (
+                <div className="wt-upload-tiles">
+                  <button className="wt-upload-tile" type="button" onClick={() => document.getElementById("wt-file-input").click()}>
+                    <span className="wt-tile-icon"><PlusIcon /></span>
+                    <span>Add files</span>
+                  </button>
+                  <button className="wt-upload-tile" type="button" onClick={() => document.getElementById("wt-folder-input").click()}>
+                    <span className="wt-tile-icon"><FolderAddIcon /></span>
+                    <span>Add folders</span>
+                  </button>
+                </div>
+                {files.length > 0 && (
                   <div className="wt-file-list">
                     {files.map((file, i) => (
                       <div key={i} className="wt-file-row">
                         <div className="wt-file-icon">{getExt(file.name)}</div>
                         <div className="wt-file-info">
-                          <span className="wt-file-name">{file.name}</span>
+                          <span className="wt-file-name">{file.webkitRelativePath || file.name}</span>
                           <span className="wt-file-size">{formatSize(file.size)}</span>
                           {progress[i] !== undefined && (
                             <div className="wt-progress">
@@ -335,21 +495,15 @@ export default function App() {
                           )}
                         </div>
                         {!uploading && (
-                          <button className="wt-file-remove" onClick={() => removeFile(i)}><XIcon /></button>
+                          <button className="wt-file-remove" type="button" onClick={() => removeFile(i)}><XIcon /></button>
                         )}
                       </div>
                     ))}
-                    {!uploading && (
-                      <button className="wt-add-more" onClick={() => document.getElementById("wt-file-input").click()}>
-                        <span className="wt-add-more-plus">+</span> Add more files
-                      </button>
-                    )}
                   </div>
                 )}
                 <input id="wt-file-input" type="file" multiple style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
+                <input id="wt-folder-input" type="file" multiple webkitdirectory="" directory="" style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
               </div>
-
-              <div className="wt-divider" />
 
               {/* Fields */}
               <div className="wt-fields">
@@ -476,15 +630,47 @@ export default function App() {
 
               {error && <div className="wt-error">{error}</div>}
 
-              <button className={`wt-transfer-btn ${uploading ? "uploading" : ""}`} onClick={handleSend} disabled={!canSend}>
+              <div className="wt-bottom-bar">
+                <select className="wt-expiry-pill" value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)}>
+                  <option value={1}>1 day</option>
+                  <option value={3}>3 days</option>
+                  <option value={7}>3 days</option>
+                  <option value={14}>14 days</option>
+                  <option value={30}>30 days</option>
+                </select>
+                <button className={`wt-more-button ${passwordEnabled ? "active" : ""}`} type="button" onClick={() => setShowOptionsMenu((v) => !v)}>
+                  <MoreIcon />
+                </button>
+                {showOptionsMenu && (
+                  <div className="wt-options-menu">
+                    <button type="button" className="wt-options-row" onClick={() => setPasswordEnabled((v) => !v)}>
+                      <span>Password protect</span>
+                      <span className={`wt-mini-switch ${passwordEnabled ? "on" : ""}`} />
+                    </button>
+                    {passwordEnabled && (
+                      <input
+                        className="wt-options-input"
+                        type="password"
+                        placeholder="Set a password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="wt-action-wrap">
+                <button className={`wt-transfer-btn ${uploading ? "uploading" : ""}`} onClick={handleSend} disabled={!canSend}>
                 {uploading
                   ? `Uploading ${totalProgress}%${eta ? ` · ${eta}` : ""}`
                   : "Transfer"}
-              </button>
+                </button>
+              </div>
             </div>
 
             <p className="wt-footer-note">
-              Files stored for {expiryDays} day{expiryDays > 1 ? "s" : ""} · Up to 2 GB per file · Stored securely in the cloud
+              Files stored for {expiryDays} day{expiryDays > 1 ? "s" : ""} · Up to 250 GB per file · Stored securely in the cloud
             </p>
           </>
         )}
@@ -497,8 +683,31 @@ export default function App() {
 
 function PlusIcon() {
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
       <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+function FolderAddIcon() {
+  return (
+    <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a2 2 0 012-2h5l2 2h7a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+      <circle cx="17" cy="16" r="4" fill="currentColor" stroke="none" opacity=".18" />
+      <path d="M17 14v4M15 16h4" />
+    </svg>
+  );
+}
+function MoreIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+function CheckSmallIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><path d="M8 12.5l2.5 2.5L16 9" />
     </svg>
   );
 }
@@ -535,6 +744,14 @@ function MessageIcon() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+    </svg>
+  );
+}
+function HistoryIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" /><path d="M12 7v5l4 2" />
     </svg>
   );
 }

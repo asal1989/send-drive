@@ -20,23 +20,69 @@ async function uploadChunk(uploadUrl, chunk, start, end, fileSize) {
   throw new Error(`HTTP ${res.status}`);
 }
 
-export async function uploadFile(file, transferId, onProgress) {
-  const sessionRes = await fetch('/api/upload-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileName: file.name, fileSize: file.size, transferId }),
-  });
+// ── Resumable session persistence ────────────────────────────────────────────
+// If the tab is closed/reloaded mid-upload, the next attempt for the *same*
+// file (same name+size, same transfer) picks up the existing Graph upload
+// session instead of starting over from byte 0. Graph upload sessions expire
+// on their own (~a few days) — if the saved session is no longer valid, we
+// silently fall back to creating a fresh one.
+const SESSION_KEY = 'sd_upload_sessions';
 
-  if (!sessionRes.ok) {
-    const err = await sessionRes.json().catch(() => ({}));
-    throw new Error(err.error || 'Failed to create upload session');
+function loadSessions() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY) || '{}'); } catch { return {}; }
+}
+function saveSessions(sessions) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(sessions)); } catch { /* storage full/unavailable — non-fatal */ }
+}
+function sessionKey(transferId, file) {
+  return `${transferId}::${file.name}::${file.size}`;
+}
+
+async function getResumeOffset(uploadUrl, fileSize) {
+  const res = await fetch(uploadUrl); // GET on a Graph upload session URL returns its current status
+  if (!res.ok) return null;
+  const data = await res.json().catch(() => null);
+  const range = data?.nextExpectedRanges?.[0];
+  if (!range) return null;
+  const start = parseInt(range.split('-')[0], 10);
+  return Number.isFinite(start) && start >= 0 && start < fileSize ? start : null;
+}
+
+export async function uploadFile(file, transferId, uploadToken, onProgress) {
+  const key = sessionKey(transferId, file);
+  const sessions = loadSessions();
+  const fileSize = file.size;
+  let uploadUrl = sessions[key];
+  let start = 0;
+
+  if (uploadUrl) {
+    const resumeOffset = await getResumeOffset(uploadUrl, fileSize).catch(() => null);
+    if (resumeOffset != null) {
+      start = resumeOffset;
+    } else {
+      uploadUrl = null; // stale/expired session — create a new one below
+    }
   }
 
-  const { uploadUrl } = await sessionRes.json();
+  if (!uploadUrl) {
+    const sessionRes = await fetch('/api/upload-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName: file.name, fileSize, transferId, uploadToken }),
+    });
+    if (!sessionRes.ok) {
+      const err = await sessionRes.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create upload session');
+    }
+    ({ uploadUrl } = await sessionRes.json());
+    start = 0;
+  }
+
+  sessions[key] = uploadUrl;
+  saveSessions(sessions);
 
   const CHUNK_SIZE = 10 * 1024 * 1024;
-  const fileSize = file.size;
-  let start = 0;
+  onProgress(Math.round((start / fileSize) * 100));
 
   while (start < fileSize) {
     const end = Math.min(start + CHUNK_SIZE, fileSize);
@@ -60,5 +106,8 @@ export async function uploadFile(file, transferId, onProgress) {
     start = end;
     onProgress(Math.round((end / fileSize) * 100));
   }
-}
 
+  const remaining = loadSessions();
+  delete remaining[key];
+  saveSessions(remaining);
+}
