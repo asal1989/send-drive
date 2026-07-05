@@ -74,37 +74,70 @@ export default function AuthGate({ children }) {
   if (status === "signedOut") {
     return (
       <div style={styles.wrap}>
-        <div style={styles.orb1} />
-        <div style={styles.orb2} />
-        <div style={styles.orb3} />
+        <div style={styles.dotGrid} />
         <div style={styles.scene}>
-        <div style={styles.card}>
-          <div style={styles.brandRow}>
-            <img src="/logo.png" alt="BCIM" style={styles.brandLogo} />
-            <span style={styles.brandName}>BCIM ENGINEERING PRIVATE LIMITED</span>
+          <div style={styles.card}>
+            <div style={styles.leftPanel}>
+              <div style={styles.skylineBlock1} />
+              <div style={styles.skylineBlock2} />
+              <div style={styles.skylineBlock3} />
+              <div style={styles.diagonalAccent} />
+              <div style={styles.leftContent}>
+                <svg viewBox="0 0 81 72" style={styles.brandIcon}>
+                  <defs>
+                    <clipPath id="sd-hx"><polygon points="19,4 62,4 81,36 62,68 19,68 0,36" /></clipPath>
+                  </defs>
+                  <polygon points="19,4 62,4 81,36 62,68 19,68 0,36" fill="#fff" />
+                  <g clipPath="url(#sd-hx)">
+                    <rect x="-4" y="9" width="90" height="16" fill="#00a651" />
+                    <rect x="-4" y="28" width="90" height="16" fill="#00a651" />
+                    <rect x="-4" y="47" width="90" height="16" fill="#00a651" />
+                  </g>
+                </svg>
+                <div style={styles.brandWordmark}>
+                  <span style={{ color: "#00a651" }}>B</span>CIM
+                </div>
+                <div style={styles.brandTagline}>Building Better Together</div>
+              </div>
+            </div>
+            <div style={styles.rightPanel}>
+              <p style={styles.companyName}>BCIM ENGINEERING PRIVATE LIMITED</p>
+              <p style={styles.internalTool}>INTERNAL TOOL</p>
+              <div style={styles.titleUnderline} />
+              <h1 style={styles.title}>SendDrive</h1>
+              <div style={styles.iconBadge}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00a651" strokeWidth="2">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </div>
+              <p style={styles.subtitle}>This tool is for BCIM Engineering staff only.</p>
+              <button style={styles.btn} onClick={handleSignIn} disabled={signingIn}>
+                <span style={styles.btnLeft}>
+                  {signingIn ? (
+                    <span style={styles.btnSpinner} />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 21 21" style={{ flexShrink: 0 }}>
+                      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+                      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+                      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+                      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+                    </svg>
+                  )}
+                  {signingIn ? "Signing in…" : "Sign in with Microsoft"}
+                </span>
+                <span style={styles.btnChevron}>›</span>
+              </button>
+              {error && <p style={styles.error}>{error}</p>}
+              <p style={styles.footnote}>
+                <span style={styles.lockIcon}>🔒</span> BCIM ENGINEERING PRIVATE LIMITED&nbsp;|&nbsp;Staff access only
+              </p>
+              <p style={styles.footnoteSmall}>
+                Files sent to external recipients still work normally — this sign-in
+                only applies to creating new transfers.
+              </p>
+            </div>
           </div>
-          <h1 style={styles.title}>SendDrive</h1>
-          <p style={styles.subtitle}>This tool is for BCIM Engineering staff only.</p>
-          <button style={styles.btn} onClick={handleSignIn} disabled={signingIn}>
-            {signingIn ? (
-              <span style={styles.btnSpinner} />
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 21 21" style={{ flexShrink: 0 }}>
-                <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-              </svg>
-            )}
-            {signingIn ? "Signing in…" : "Sign in with Microsoft"}
-          </button>
-          {error && <p style={styles.error}>{error}</p>}
-          <div style={styles.divider} />
-          <p style={styles.footnote}>
-            Files sent to external recipients still work normally — this sign-in
-            only applies to creating new transfers.
-          </p>
-        </div>
         </div>
       </div>
     );
@@ -125,59 +158,75 @@ const styles = {
   wrap: {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
     padding: 20, position: "relative", overflow: "hidden",
-    background: "radial-gradient(circle at 20% 15%, #0f3a32 0%, #06110e 45%, #030807 100%)",
+    background: "linear-gradient(135deg, #eef3f9 0%, #f7f9fc 55%, #eef3f9 100%)",
     fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
   },
-  scene: { perspective: 1200 },
-  orb1: {
-    position: "absolute", top: "8%", left: "10%", width: 260, height: 260, borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(0,182,155,0.35), transparent 70%)",
-    filter: "blur(10px)", animation: "sd-orb-drift 9s ease-in-out infinite",
+  dotGrid: {
+    position: "absolute", top: 0, right: 0, width: "45%", height: "55%",
+    backgroundImage: "radial-gradient(rgba(0,166,81,0.18) 1.5px, transparent 1.5px)",
+    backgroundSize: "14px 14px", pointerEvents: "none",
   },
-  orb2: {
-    position: "absolute", bottom: "10%", right: "8%", width: 320, height: 320, borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(90,255,210,0.20), transparent 70%)",
-    filter: "blur(14px)", animation: "sd-orb-drift 12s ease-in-out infinite reverse",
-  },
-  orb3: {
-    position: "absolute", top: "48%", right: "22%", width: 160, height: 160, borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%)",
-    filter: "blur(8px)", animation: "sd-orb-drift 7s ease-in-out infinite",
-  },
+  scene: { perspective: 1200, position: "relative", zIndex: 1 },
   spinner: {
-    width: 32, height: 32, border: "3px solid #d9f2ee", borderTopColor: "#00b69b",
+    width: 32, height: 32, border: "3px solid #d9f2ee", borderTopColor: "#00a651",
     borderRadius: "50%", animation: "sd-spin 0.8s linear infinite",
   },
   card: {
-    background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(0,0,0,.35)",
-    width: "100%", maxWidth: 400, padding: "36px 40px 32px", textAlign: "center",
-    border: "1px solid rgba(255,255,255,0.06)", position: "relative", zIndex: 1,
+    background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(20,40,80,.16)",
+    width: "100%", maxWidth: 640, display: "flex", overflow: "hidden",
+    border: "1px solid rgba(20,40,80,0.05)", position: "relative",
     transformStyle: "preserve-3d", animation: "sd-card-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both",
   },
-  brandRow: {
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #f0f0f0",
+  leftPanel: {
+    width: 220, flexShrink: 0, position: "relative", overflow: "hidden",
+    background: "#0f2a52",
+    clipPath: "polygon(0 0, 100% 0, 78% 100%, 0% 100%)",
   },
-  brandLogo: { height: 32, width: "auto", flexShrink: 0, animation: "sd-logo-float 4s ease-in-out infinite" },
-  brandName: { fontSize: 12.5, fontWeight: 700, color: "#3c3c3c", letterSpacing: "0.01em", textAlign: "right", maxWidth: 180, lineHeight: 1.35 },
-  title: { fontSize: 21, fontWeight: 700, color: "#161616", marginBottom: 8, letterSpacing: "-0.01em" },
-  subtitle: { fontSize: 13.5, color: "#787878", marginBottom: 28, lineHeight: 1.6, maxWidth: 280, margin: "0 auto 28px" },
+  skylineBlock1: { position: "absolute", bottom: 0, left: 8, width: 28, height: 70, background: "rgba(255,255,255,0.05)" },
+  skylineBlock2: { position: "absolute", bottom: 0, left: 44, width: 20, height: 110, background: "rgba(255,255,255,0.04)" },
+  skylineBlock3: { position: "absolute", bottom: 0, left: 70, width: 34, height: 50, background: "rgba(255,255,255,0.045)" },
+  diagonalAccent: {
+    position: "absolute", bottom: 26, left: -10, width: "150%", height: 3,
+    background: "#00a651", transform: "rotate(-32deg)", transformOrigin: "left center",
+  },
+  leftContent: {
+    position: "relative", zIndex: 1, height: "100%", display: "flex", flexDirection: "column",
+    alignItems: "center", justifyContent: "center", padding: "32px 20px", textAlign: "center",
+  },
+  brandIcon: { width: 46, height: 41, flexShrink: 0, animation: "sd-logo-float 4s ease-in-out infinite" },
+  brandWordmark: { marginTop: 14, fontSize: 20, fontWeight: 900, letterSpacing: "0.03em", color: "#fff", fontFamily: "'Arial Black', Arial, sans-serif" },
+  brandTagline: { marginTop: 8, fontSize: 10.5, letterSpacing: "0.12em", color: "rgba(255,255,255,0.65)", textTransform: "uppercase" },
+  rightPanel: {
+    flex: 1, padding: "38px 40px 30px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center",
+  },
+  companyName: { fontSize: 13, fontWeight: 800, color: "#0f2a52", letterSpacing: "0.02em", margin: 0 },
+  internalTool: { fontSize: 10, fontWeight: 600, color: "#9aa5b1", letterSpacing: "0.18em", margin: "4px 0 0" },
+  titleUnderline: { width: 32, height: 2.5, background: "#00a651", borderRadius: 2, margin: "12px 0 18px" },
+  title: { fontSize: 22, fontWeight: 700, color: "#0f2a52", marginBottom: 16, letterSpacing: "-0.01em" },
+  iconBadge: {
+    width: 46, height: 46, borderRadius: 12, background: "#eefaf2", border: "1px solid #d8f0e0",
+    display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16,
+  },
+  subtitle: { fontSize: 13, color: "#787878", marginBottom: 24, lineHeight: 1.6, maxWidth: 260 },
   btn: {
-    width: "100%", padding: "12px 16px", background: "#fff", color: "#3c3c3c",
-    border: "1px solid #d6d6d6", borderRadius: 10, fontSize: 14.5, fontWeight: 600,
+    width: "100%", padding: "12px 18px", background: "#fff", color: "#3c3c3c",
+    border: "1px solid #d6d6d6", borderRadius: 10, fontSize: 14, fontWeight: 600,
     cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center",
-    justifyContent: "center", gap: 10, transition: "background 0.15s, border-color 0.15s",
+    justifyContent: "space-between", gap: 10, transition: "background 0.15s, border-color 0.15s",
   },
+  btnLeft: { display: "flex", alignItems: "center", gap: 10 },
+  btnChevron: { fontSize: 18, color: "#b0b0b0" },
   btnSpinner: {
     width: 15, height: 15, border: "2px solid #d6d6d6", borderTopColor: "#3c3c3c",
     borderRadius: "50%", display: "inline-block", animation: "sd-spin 0.7s linear infinite",
   },
   error: {
     marginTop: 14, fontSize: 12.5, color: "#b42318", background: "#fef3f2",
-    border: "1px solid #fecdca", borderRadius: 8, padding: "8px 12px",
+    border: "1px solid #fecdca", borderRadius: 8, padding: "8px 12px", width: "100%",
   },
-  divider: { height: 1, background: "#eee", margin: "26px 0 14px" },
-  footnote: { fontSize: 11, color: "#b0b0b0", lineHeight: 1.5 },
+  footnote: { fontSize: 11, color: "#9aa5b1", lineHeight: 1.5, marginTop: 20, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 },
+  footnoteSmall: { fontSize: 10.5, color: "#b0b0b0", lineHeight: 1.5, marginTop: 10 },
+  lockIcon: { fontSize: 10 },
   staffBadge: {
     position: "fixed", top: 10, right: 12, zIndex: 999, display: "flex", alignItems: "center",
     gap: 10, background: "rgba(255,255,255,0.95)", border: "1px solid #e5e5e5", borderRadius: 20,
@@ -201,10 +250,6 @@ styleTag.textContent = `
   @keyframes sd-logo-float {
     0%, 100% { transform: perspective(300px) translateY(0) rotateY(0deg); }
     50%      { transform: perspective(300px) translateY(-3px) rotateY(10deg); }
-  }
-  @keyframes sd-orb-drift {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50%      { transform: translate(24px, -18px) scale(1.08); }
   }
 `;
 document.head.appendChild(styleTag);
