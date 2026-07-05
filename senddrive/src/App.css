@@ -508,6 +508,88 @@ body {
   transition: width 0.3s;
 }
 
+/* ─── Upload animation overlay (laptop → cloud) ────────────── */
+
+.wt-upload-anim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #14213d 0%, #0b1220 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 28px 20px;
+  animation: wt-anim-fade-in 0.25s ease both;
+}
+
+@keyframes wt-anim-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.wt-upload-anim-percent {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f0b429;
+  text-shadow: 0 0 12px rgba(240, 180, 41, 0.5);
+}
+
+.wt-upload-anim-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.wt-upload-anim-laptop,
+.wt-upload-anim-cloud {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 10px rgba(232, 163, 61, 0.35));
+}
+
+.wt-upload-anim-track {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  background-image: repeating-linear-gradient(90deg, #e8a33d 0 8px, transparent 8px 16px);
+  animation: wt-dash-move 1s linear infinite;
+}
+
+@keyframes wt-dash-move {
+  from { background-position: 0 0; }
+  to   { background-position: -32px 0; }
+}
+
+.wt-upload-anim-file {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: wt-file-fly 1.8s ease-in-out infinite;
+}
+
+.wt-upload-anim-file.f1 { animation-delay: 0s; }
+.wt-upload-anim-file.f2 { animation-delay: 0.6s; }
+.wt-upload-anim-file.f3 { animation-delay: 1.2s; }
+
+@keyframes wt-file-fly {
+  0%   { left: 0%;   opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+.wt-upload-anim-caption {
+  font-size: 12.5px;
+  color: #9aa5b8;
+  letter-spacing: 0.01em;
+}
+
 .wt-file-remove {
   width: 28px;
   height: 28px;

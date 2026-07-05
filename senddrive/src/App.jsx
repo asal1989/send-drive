@@ -475,6 +475,7 @@ export default function App() {
         ) : (
           <>
             <div className="wt-card wt-transfer-card">
+              {uploading && <UploadTransferAnimation percent={totalProgress} />}
               <div className="wt-card-tab">Request files</div>
               <div
                 className={`wt-files-section ${dragOver ? "drag" : ""}`}
@@ -789,5 +790,47 @@ function CheckCircleIcon() {
     <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 11.08V12a10 10 0 11-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
     </svg>
+  );
+}
+
+function FileFlyIcon() {
+  return (
+    <svg width="20" height="24" viewBox="0 0 24 28" fill="none">
+      <path d="M4 2h11l5 5v19a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z" fill="#f3f3f3" stroke="#d8d8d8" strokeWidth="1" />
+      <path d="M15 2v5h5" fill="none" stroke="#d8d8d8" strokeWidth="1" />
+      <rect x="5" y="12" width="10" height="1.6" rx="0.8" fill="#e8a33d" />
+      <rect x="5" y="16" width="14" height="1.6" rx="0.8" fill="#cfcfcf" />
+      <rect x="5" y="20" width="8" height="1.6" rx="0.8" fill="#cfcfcf" />
+    </svg>
+  );
+}
+
+function UploadTransferAnimation({ percent }) {
+  return (
+    <div className="wt-upload-anim">
+      <span className="wt-upload-anim-percent">{percent}%</span>
+      <div className="wt-upload-anim-row">
+        <svg className="wt-upload-anim-laptop" width="48" height="48" viewBox="0 0 64 64" fill="none">
+          <rect x="10" y="12" width="44" height="30" rx="3" fill="#1b2740" stroke="#e8a33d" strokeWidth="2" />
+          <rect x="15" y="17" width="34" height="20" rx="1.5" fill="#0f1826" />
+          <rect x="18" y="20" width="20" height="3" rx="1.5" fill="#e8a33d" opacity="0.85" />
+          <rect x="18" y="26" width="26" height="2.5" rx="1.25" fill="#6b7a99" />
+          <rect x="18" y="31" width="14" height="2.5" rx="1.25" fill="#6b7a99" />
+          <path d="M4 46l6-6h44l6 6z" fill="#233254" stroke="#e8a33d" strokeWidth="1.5" />
+        </svg>
+
+        <div className="wt-upload-anim-track">
+          <span className="wt-upload-anim-file f1"><FileFlyIcon /></span>
+          <span className="wt-upload-anim-file f2"><FileFlyIcon /></span>
+          <span className="wt-upload-anim-file f3"><FileFlyIcon /></span>
+        </div>
+
+        <svg className="wt-upload-anim-cloud" width="52" height="52" viewBox="0 0 64 64" fill="none">
+          <path d="M46.5 44H19a10 10 0 01-1.4-19.9 13.5 13.5 0 0126.6-3A9.5 9.5 0 0146.5 44z" fill="#1b2740" stroke="#e8a33d" strokeWidth="2" />
+          <path d="M32 30v14M26 38l6 6 6-6" stroke="#e8a33d" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <p className="wt-upload-anim-caption">Sending your files securely…</p>
+    </div>
   );
 }
