@@ -634,7 +634,7 @@ export default function App() {
                 <select className="wt-expiry-pill" value={expiryDays} onChange={(e) => setExpiryDays(e.target.value)}>
                   <option value={1}>1 day</option>
                   <option value={3}>3 days</option>
-                  <option value={7}>3 days</option>
+                  <option value={7}>7 days</option>
                   <option value={14}>14 days</option>
                   <option value={30}>30 days</option>
                 </select>

@@ -779,87 +779,7 @@ updateClock();setInterval(updateClock,30000);
 }
 
 app.get(['/portal', '/softwares', '/apps'], (req, res) => {
-  return res.send(portalPageHtml());
-  const origin = makeBaseUrl();
-  const erpUrl = process.env.ERP_URL || origin.replace(/:\d+$/, ':3000');
-  const frontendUrl = process.env.FRONTEND_URL || origin.replace(/:\d+$/, ':5173');
-  const sendDriveUrl = process.env.SENDDRIVE_URL || origin;
-  const apps = [
-    {
-      name: 'BCIM ERP',
-      description: 'Project, material, approval, and construction workflow system.',
-      href: erpUrl,
-      accent: '#315bff',
-      initials: 'ERP',
-    },
-    {
-      name: 'BCIM Frontend',
-      description: 'Development frontend access for the active BCIM software interface.',
-      href: frontendUrl,
-      accent: '#7c3aed',
-      initials: 'UI',
-    },
-    {
-      name: 'SendDrive',
-      description: 'Secure file transfer with email delivery, expiry, and password protection.',
-      href: sendDriveUrl,
-      accent: '#00b69b',
-      initials: 'SD',
-    },
-  ];
-
-  const cards = apps.map(app => `
-    <a class="app-card" href="${escapeHtml(app.href)}">
-      <span class="app-icon" style="background:${app.accent}">${escapeHtml(app.initials)}</span>
-      <span class="app-copy">
-        <strong>${escapeHtml(app.name)}</strong>
-        <small>${escapeHtml(app.description)}</small>
-      </span>
-      <span class="arrow">Open</span>
-    </a>
-  `).join('');
-
-  res.send(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>BCIM Software Portal</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{min-height:100vh;font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fb;color:#101828;display:flex;align-items:center;justify-content:center;padding:24px}
-    .shell{width:100%;max-width:760px}
-    .brand{display:flex;align-items:center;gap:14px;margin-bottom:26px}
-    .mark{width:48px;height:48px;border-radius:12px;background:#111827;color:#fff;display:grid;place-items:center;font-weight:800}
-    h1{font-size:28px;line-height:1.1}
-    .sub{color:#667085;font-size:14px;margin-top:5px}
-    .panel{background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:12px;box-shadow:0 22px 55px rgba(16,24,40,.10)}
-    .app-card{display:flex;align-items:center;gap:16px;padding:18px;border-radius:12px;text-decoration:none;color:inherit;transition:background .15s,transform .15s}
-    .app-card:hover{background:#f8fafc;transform:translateY(-1px)}
-    .app-card+.app-card{border-top:1px solid #eef1f5}
-    .app-icon{width:54px;height:54px;border-radius:14px;color:#fff;display:grid;place-items:center;font-weight:800;letter-spacing:.03em;flex:0 0 auto}
-    .app-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-    .app-copy strong{font-size:17px}
-    .app-copy small{font-size:13px;color:#667085;line-height:1.45}
-    .arrow{font-size:13px;font-weight:700;color:#315bff;white-space:nowrap}
-    .foot{margin-top:16px;text-align:center;font-size:12px;color:#98a2b3}
-    @media(max-width:560px){body{padding:16px}.brand{align-items:flex-start}.app-card{align-items:flex-start}.arrow{display:none}h1{font-size:24px}}
-  </style>
-</head>
-<body>
-  <main class="shell">
-    <div class="brand">
-      <div class="mark">BCIM</div>
-      <div>
-        <h1>Software Portal</h1>
-        <p class="sub">One place to access company applications.</p>
-      </div>
-    </div>
-    <section class="panel">${cards}</section>
-    <p class="foot">BCIM Engineering Private Limited</p>
-  </main>
-</body>
-</html>`);
+  res.send(portalPageHtml());
 });
 
 // ── HTML templates ───────────────────────────────────────────────────────────
@@ -972,6 +892,6 @@ const distPath = path.join(__dirname, '../senddrive/dist');
 app.use(express.static(distPath));
 app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 
-app.listen(process.env.PORT || 3002, () =>
-  console.log(`SendDrive server running on port ${process.env.PORT || 3002}`)
+app.listen(process.env.PORT || 3001, () =>
+  console.log(`SendDrive server running on port ${process.env.PORT || 3001}`)
 );
