@@ -87,7 +87,7 @@ export default function AuthGate({ children }) {
                 <div style={styles.brandWordmark}>
                   <span style={{ color: "#de2e16" }}>B</span>CIM
                 </div>
-                <div style={styles.brandTagline}>Building Better Together</div>
+                <div style={styles.brandTagline}>Build Your Dreams</div>
               </div>
             </div>
             <div style={styles.rightPanel}>
