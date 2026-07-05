@@ -74,10 +74,14 @@ export default function AuthGate({ children }) {
   if (status === "signedOut") {
     return (
       <div style={styles.wrap}>
+        <div style={styles.orb1} />
+        <div style={styles.orb2} />
+        <div style={styles.orb3} />
+        <div style={styles.scene}>
         <div style={styles.card}>
           <div style={styles.brandRow}>
             <img src="/logo.png" alt="BCIM" style={styles.brandLogo} />
-            <span style={styles.brandName}>BCIM Engineering</span>
+            <span style={styles.brandName}>BCIM ENGINEERING PRIVATE LIMITED</span>
           </div>
           <h1 style={styles.title}>SendDrive</h1>
           <p style={styles.subtitle}>This tool is for BCIM Engineering staff only.</p>
@@ -101,6 +105,7 @@ export default function AuthGate({ children }) {
             only applies to creating new transfers.
           </p>
         </div>
+        </div>
       </div>
     );
   }
@@ -119,9 +124,25 @@ export default function AuthGate({ children }) {
 const styles = {
   wrap: {
     minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-    padding: 20,
+    padding: 20, position: "relative", overflow: "hidden",
     background: "radial-gradient(circle at 20% 15%, #0f3a32 0%, #06110e 45%, #030807 100%)",
     fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+  },
+  scene: { perspective: 1200 },
+  orb1: {
+    position: "absolute", top: "8%", left: "10%", width: 260, height: 260, borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(0,182,155,0.35), transparent 70%)",
+    filter: "blur(10px)", animation: "sd-orb-drift 9s ease-in-out infinite",
+  },
+  orb2: {
+    position: "absolute", bottom: "10%", right: "8%", width: 320, height: 320, borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(90,255,210,0.20), transparent 70%)",
+    filter: "blur(14px)", animation: "sd-orb-drift 12s ease-in-out infinite reverse",
+  },
+  orb3: {
+    position: "absolute", top: "48%", right: "22%", width: 160, height: 160, borderRadius: "50%",
+    background: "radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%)",
+    filter: "blur(8px)", animation: "sd-orb-drift 7s ease-in-out infinite",
   },
   spinner: {
     width: 32, height: 32, border: "3px solid #d9f2ee", borderTopColor: "#00b69b",
@@ -130,14 +151,15 @@ const styles = {
   card: {
     background: "#fff", borderRadius: 20, boxShadow: "0 24px 64px rgba(0,0,0,.35)",
     width: "100%", maxWidth: 400, padding: "36px 40px 32px", textAlign: "center",
-    border: "1px solid rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.06)", position: "relative", zIndex: 1,
+    transformStyle: "preserve-3d", animation: "sd-card-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both",
   },
   brandRow: {
     display: "flex", alignItems: "center", justifyContent: "space-between",
     marginBottom: 28, paddingBottom: 20, borderBottom: "1px solid #f0f0f0",
   },
-  brandLogo: { height: 32, width: "auto", flexShrink: 0 },
-  brandName: { fontSize: 14, fontWeight: 700, color: "#3c3c3c", letterSpacing: "-0.01em" },
+  brandLogo: { height: 32, width: "auto", flexShrink: 0, animation: "sd-logo-float 4s ease-in-out infinite" },
+  brandName: { fontSize: 12.5, fontWeight: 700, color: "#3c3c3c", letterSpacing: "0.01em", textAlign: "right", maxWidth: 180, lineHeight: 1.35 },
   title: { fontSize: 21, fontWeight: 700, color: "#161616", marginBottom: 8, letterSpacing: "-0.01em" },
   subtitle: { fontSize: 13.5, color: "#787878", marginBottom: 28, lineHeight: 1.6, maxWidth: 280, margin: "0 auto 28px" },
   btn: {
@@ -168,7 +190,21 @@ const styles = {
   },
 };
 
-// Spinner keyframes — injected once since this file has no external CSS import.
+// Animation keyframes — injected once since this file has no external CSS import.
 const styleTag = document.createElement("style");
-styleTag.textContent = "@keyframes sd-spin { to { transform: rotate(360deg); } }";
+styleTag.textContent = `
+  @keyframes sd-spin { to { transform: rotate(360deg); } }
+  @keyframes sd-card-enter {
+    from { opacity: 0; transform: translateY(24px) rotateX(-10deg) scale(0.96); }
+    to   { opacity: 1; transform: translateY(0) rotateX(0deg) scale(1); }
+  }
+  @keyframes sd-logo-float {
+    0%, 100% { transform: perspective(300px) translateY(0) rotateY(0deg); }
+    50%      { transform: perspective(300px) translateY(-3px) rotateY(10deg); }
+  }
+  @keyframes sd-orb-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(24px, -18px) scale(1.08); }
+  }
+`;
 document.head.appendChild(styleTag);
