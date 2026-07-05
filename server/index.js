@@ -125,17 +125,23 @@ function signStaffAuth(email) {
   return crypto.createHmac('sha256', ADMIN_PASSWORD).update(`staff:${email}`).digest('hex');
 }
 
-function hasStaffAccess(req) {
+function verifiedStaffEmail(req) {
   const email = getCookie(req, 'sd_staff_email');
   const sig   = getCookie(req, 'sd_staff_sig');
-  if (!email || !sig) return false;
-  const expected = Buffer.from(signStaffAuth(decodeURIComponent(email)));
+  if (!email || !sig) return null;
+  const decoded  = decodeURIComponent(email);
+  const expected = Buffer.from(signStaffAuth(decoded));
   const actual   = Buffer.from(sig);
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual) ? decoded : null;
+}
+
+function hasStaffAccess(req) {
+  return verifiedStaffEmail(req) !== null;
 }
 
 function requireStaff(req, res, next) {
-  if (hasStaffAccess(req)) return next();
+  const email = verifiedStaffEmail(req);
+  if (email) { req.staffEmail = email; return next(); }
   res.status(401).json({ error: 'Sign in with your company Microsoft account first' });
 }
 
@@ -569,7 +575,11 @@ app.post('/api/send-email', emailLimiter, requireStaff, async (req, res) => {
 
   const displayTitle = sanitizeText(title) || 'Files shared with you';
   const safeMessage  = sanitizeText(message);
-  const senderLabel  = isEmail(senderEmail) ? sanitizeText(senderEmail) : 'Someone';
+  // Prefer the verified, signed-in staff email over the free-text "Your email"
+  // field — that field is just a decorative pre-fill and can be edited to
+  // anything, so it shouldn't be trusted as the sender's real identity.
+  const effectiveSenderEmail = req.staffEmail || senderEmail;
+  const senderLabel  = isEmail(effectiveSenderEmail) ? sanitizeText(effectiveSenderEmail) : 'Someone';
   const expiryNum    = Math.max(1, Math.min(30, parseInt(expiryDays) || 7));
   const shareLink    = transferUrl(transferId);
 
@@ -615,7 +625,13 @@ app.post('/api/send-email', emailLimiter, requireStaff, async (req, res) => {
           subject: `${senderLabel} sent you: ${displayTitle}`,
           body: { contentType: 'HTML', content: html },
           toRecipients: safeRecipients.map(r => ({ emailAddress: { address: r } })),
-          replyTo: isEmail(senderEmail) ? [{ emailAddress: { address: sanitizeText(senderEmail) } }] : undefined,
+          // The mailbox actually sending this is the shared UPN service account, so Exchange
+          // won't let us change the From *address* without Send-As on another mailbox — but it
+          // does let us set a custom display *name* on that same address. Putting the real
+          // sender's email in the name is what stops recipients from just seeing "BCIM
+          // Engineering" as the sender with no clue which staff member sent the files.
+          from: { emailAddress: { address: UPN, name: `${senderLabel} (via SendDrive)` } },
+          replyTo: isEmail(effectiveSenderEmail) ? [{ emailAddress: { address: sanitizeText(effectiveSenderEmail) } }] : undefined,
         },
         saveToSentItems: false,
       },
