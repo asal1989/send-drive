@@ -7,17 +7,25 @@ export async function createTransfer() {
   return res.json();
 }
 
-async function uploadChunk(uploadUrl, chunk, start, end, fileSize) {
-  const res = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'Content-Length': String(end - start),
-      'Content-Range': `bytes ${start}-${end - 1}/${fileSize}`,
-    },
-    body: chunk,
+// Uses XMLHttpRequest instead of fetch so we get real byte-level upload
+// progress (xhr.upload.onprogress) even within a single chunk — fetch has no
+// upload progress event, which made small files (under one 10MB chunk) jump
+// straight from 0% to 100% with nothing in between.
+function uploadChunk(uploadUrl, chunk, start, end, fileSize, onChunkProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${fileSize}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onChunkProgress) onChunkProgress(e.loaded);
+    };
+    xhr.onload = () => {
+      if (xhr.status === 200 || xhr.status === 201 || xhr.status === 202) resolve();
+      else reject(new Error(`HTTP ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(chunk);
   });
-  if (res.status === 200 || res.status === 201 || res.status === 202) return res;
-  throw new Error(`HTTP ${res.status}`);
 }
 
 // ── Resumable session persistence ────────────────────────────────────────────
@@ -92,7 +100,9 @@ export async function uploadFile(file, transferId, uploadToken, onProgress) {
     let lastErr;
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
-        await uploadChunk(uploadUrl, chunk, start, end, fileSize);
+        await uploadChunk(uploadUrl, chunk, start, end, fileSize, (loadedInChunk) => {
+          onProgress(Math.round(((start + loadedInChunk) / fileSize) * 100));
+        });
         lastErr = null;
         break;
       } catch (e) {
