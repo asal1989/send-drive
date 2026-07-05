@@ -36,6 +36,18 @@ function persistEmails(emails) {
   localStorage.setItem("sd_recent_emails", JSON.stringify(emails));
 }
 
+// ── Identity handed off from the ERP's floating launcher ────────────────────
+// No login here (see "My Transfers" note below) — this just pre-fills the
+// sender email when opened via ?from=<email> from inside the ERP, so people
+// don't have to re-type who they are every time. Purely a convenience value:
+// nothing prevents someone from typing over it or omitting it entirely.
+function erpHandoffEmail() {
+  try {
+    const email = new URLSearchParams(window.location.search).get("from");
+    return email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : "";
+  } catch { return ""; }
+}
+
 // ── "My Transfers" — sender-side history + self-service recall ──────────────
 // There's no login system, so history lives in this browser's localStorage
 // (same trust model as the uploadToken itself: whoever holds it owns the
@@ -175,7 +187,7 @@ export default function App() {
   // Email fields
   const [recipients, setRecipients] = useState([]);
   const [recipientInput, setRecipientInput] = useState("");
-  const [senderEmail, setSenderEmail] = useState("");
+  const [senderEmail, setSenderEmail] = useState(erpHandoffEmail);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
 
