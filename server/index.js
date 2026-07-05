@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const archiver = require('archiver'); // pinned to 7.0.1 in package.json — 8.x is ESM-only and dropped the archiver('zip', opts) factory API
 const { getValidToken } = require('./auth');
+const { verifyIdToken } = require('./staffAuth');
 
 const app = express();
 app.set('trust proxy', 1); // trust Nginx reverse proxy
@@ -114,6 +115,30 @@ function hasAdminAccess(req) {
   return getCookie(req, 'sd_admin') === signAdminAuth();
 }
 
+// ── Staff-only login (Sign in with Microsoft / company account) ─────────────
+// Gates the SENDER side only (creating/managing transfers) — the recipient
+// download page (/get/:transferId) stays public on purpose, since the whole
+// point of the tool is staff sending files to external people who were never
+// going to have a company Microsoft account. Real enforcement happens
+// server-side here; the frontend login screen is just the UX for it.
+function signStaffAuth(email) {
+  return crypto.createHmac('sha256', ADMIN_PASSWORD).update(`staff:${email}`).digest('hex');
+}
+
+function hasStaffAccess(req) {
+  const email = getCookie(req, 'sd_staff_email');
+  const sig   = getCookie(req, 'sd_staff_sig');
+  if (!email || !sig) return false;
+  const expected = Buffer.from(signStaffAuth(decodeURIComponent(email)));
+  const actual   = Buffer.from(sig);
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+function requireStaff(req, res, next) {
+  if (hasStaffAccess(req)) return next();
+  res.status(401).json({ error: 'Sign in with your company Microsoft account first' });
+}
+
 function getExt(name) {
   const p = String(name || '').lastIndexOf('.');
   return p > -1 ? name.slice(p + 1).toUpperCase().slice(0, 4) : 'FILE';
@@ -134,8 +159,43 @@ app.get('/api/health', async (req, res) => {
   } catch { res.status(500).json({ status: 'error', onedrive: false }); }
 });
 
+// ── POST /api/auth/verify — exchange a Microsoft ID token for a staff session ──
+app.post('/api/auth/verify', limiter, async (req, res) => {
+  const { idToken } = req.body || {};
+  if (!idToken) return res.status(400).json({ error: 'idToken required' });
+  try {
+    const { email, name } = await verifyIdToken(idToken);
+    const sig = signStaffAuth(email);
+    const common = 'HttpOnly; SameSite=Lax; Path=/; Max-Age=43200'; // 12 hours
+    const secureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+    res.setHeader('Set-Cookie', [
+      `sd_staff_email=${encodeURIComponent(email)}; ${common}${secureFlag}`,
+      `sd_staff_sig=${sig}; ${common}${secureFlag}`,
+    ]);
+    res.json({ ok: true, email, name });
+  } catch (err) {
+    console.error('[auth/verify]', err.message);
+    res.status(403).json({ error: 'Not a valid company account, or sign-in could not be verified' });
+  }
+});
+
+// ── GET /api/auth/me — current staff session, if any ─────────────────────────
+app.get('/api/auth/me', (req, res) => {
+  if (!hasStaffAccess(req)) return res.status(401).json({ authenticated: false });
+  res.json({ authenticated: true, email: decodeURIComponent(getCookie(req, 'sd_staff_email') || '') });
+});
+
+// ── POST /api/auth/logout ─────────────────────────────────────────────────────
+app.post('/api/auth/logout', (req, res) => {
+  res.setHeader('Set-Cookie', [
+    'sd_staff_email=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+    'sd_staff_sig=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0',
+  ]);
+  res.json({ ok: true });
+});
+
 // ── POST /api/create-transfer ────────────────────────────────────────────────
-app.post('/api/create-transfer', limiter, async (req, res) => {
+app.post('/api/create-transfer', limiter, requireStaff, async (req, res) => {
   const transferId = `transfer-${crypto.randomBytes(5).toString('hex')}`;
   const uploadToken = makeToken();
   try {
@@ -170,7 +230,7 @@ app.post('/api/create-transfer', limiter, async (req, res) => {
 });
 
 // ── POST /api/upload-session ─────────────────────────────────────────────────
-app.post('/api/upload-session', limiter, async (req, res) => {
+app.post('/api/upload-session', limiter, requireStaff, async (req, res) => {
   const { fileName, fileSize, transferId, uploadToken } = req.body;
   if (!fileName || !fileSize || !transferId || !uploadToken)
     return res.status(400).json({ error: 'fileName, fileSize, transferId and uploadToken are required' });
@@ -196,7 +256,7 @@ app.post('/api/upload-session', limiter, async (req, res) => {
 });
 
 // ── POST /api/register-transfer ──────────────────────────────────────────────
-app.post('/api/register-transfer', limiter, (req, res) => {
+app.post('/api/register-transfer', limiter, requireStaff, (req, res) => {
   const { transferId, uploadToken, senderEmail, title, fileNames, fileSizes, expiryDays, password } = req.body;
   if (!transferId || !isTransferId(transferId))
     return res.status(400).json({ error: 'Invalid transferId' });
@@ -409,7 +469,7 @@ app.get('/api/dl-zip/:transferId', limiter, async (req, res) => {
 // ── GET /api/transfer/:transferId/status — sender-side status (no password needed) ──
 // Used by the "My Transfers" panel — auth is the uploadToken itself, same trust
 // level as the download link (whoever holds the token created the transfer).
-app.get('/api/transfer/:transferId/status', limiter, (req, res) => {
+app.get('/api/transfer/:transferId/status', limiter, requireStaff, (req, res) => {
   const { transferId } = req.params;
   const token = req.query.token;
   if (!isTransferId(transferId)) return res.status(404).json({ error: 'Not found' });
@@ -430,7 +490,7 @@ app.get('/api/transfer/:transferId/status', limiter, (req, res) => {
 
 // ── POST /api/transfer/:transferId/cancel — sender-initiated recall ──────────
 // Same trust model as above: holding the uploadToken is proof of ownership.
-app.post('/api/transfer/:transferId/cancel', limiter, async (req, res) => {
+app.post('/api/transfer/:transferId/cancel', limiter, requireStaff, async (req, res) => {
   const { transferId } = req.params;
   const { uploadToken } = req.body;
   if (!isTransferId(transferId)) return res.status(404).json({ error: 'Not found' });
@@ -494,7 +554,7 @@ async function sendDownloadNotification(record, transferId) {
 }
 
 // ── POST /api/send-email ─────────────────────────────────────────────────────
-app.post('/api/send-email', emailLimiter, async (req, res) => {
+app.post('/api/send-email', emailLimiter, requireStaff, async (req, res) => {
   const { transferId, uploadToken, recipients, senderEmail, title, message, fileNames, expiryDays } = req.body;
   if (!isTransferId(transferId)) return res.status(400).json({ error: 'Invalid transferId' });
   const record = getRecord(transferId);
